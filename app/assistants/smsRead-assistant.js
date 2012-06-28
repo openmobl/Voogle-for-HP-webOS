@@ -183,7 +183,7 @@ this.controller.setupWidget("msgScroller",
 SmsReadAssistant.prototype.keyDown = function(event) {
 	if(Mojo.Char.isEnterKey(event.keyCode))
 	{
-		this.send().bind(this);
+		this.send();
 	}
 }
 

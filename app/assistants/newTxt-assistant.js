@@ -64,7 +64,7 @@ function defancifyNumber(number)
 NewTxtAssistant.prototype.keyDown = function(event) {
 	if(Mojo.Char.isEnterKey(event.keyCode))
 	{
-		this.sendMsg().bind(this);
+		this.sendMsg(); //.bind(this);
 	}
 };
 
