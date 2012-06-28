@@ -85,8 +85,8 @@ InboxAssistant.prototype.setup = function() {
         }
     );
 	
-	setTimeout(function() {this.loadFolder().bind(this);}.bind(this), 200);
-	this.refreshId = setInterval(function() {this.loadFolder().bind(this);}.bind(this), 30000);
+	setTimeout(function() {this.loadFolder();}.bind(this), 200);
+	this.refreshId = setInterval(function() {this.loadFolder();}.bind(this), 30000);
 	Mojo.Event.listen(this.controller.get("inboxMsgs"), Mojo.Event.listTap, this.listTap.bind(this));
 	Mojo.Event.listen(this.controller.get("inboxMsgs"), Mojo.Event.listDelete, this.listDelete.bind(this));
 };
@@ -186,13 +186,15 @@ InboxAssistant.prototype.loadFolder = function(event) {
 		}
 		for (x = 0; x <= folder.length; x++) {
 			var msg = folder[x];
-			if (msg.isRead == false) {
-				var objID = "unread_" + msg.num;
-				document.getElementById(objID).style.display = "";
-			}
-			if (msg.star == true) {
-				var objID = "star_" + msg.num;
-				document.getElementById(objID).src = "images/ui/active_star.png";
+			if (msg !== null && msg !== undefined) {
+				if (msg.isRead == false) {
+					var objID = "unread_" + msg.num;
+					document.getElementById(objID).style.display = "";
+				}
+				if (msg.star == true) {
+					var objID = "star_" + msg.num;
+					document.getElementById(objID).src = "images/ui/active_star.png";
+				}
 			}
 		}
 	}.bind(this));
