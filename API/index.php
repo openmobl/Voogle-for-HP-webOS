@@ -24,17 +24,70 @@ class GoogleVoice
 		$this->_cookieFile = '/tmp/gvCookies-'.md5($login).'.txt';
 
 		$this->_ch = curl_init();
+		curl_setopt($this->_ch, CURLOPT_COOKIEFILE, $this->_cookieFile);
 		curl_setopt($this->_ch, CURLOPT_COOKIEJAR, $this->_cookieFile);
 		curl_setopt($this->_ch, CURLOPT_FOLLOWLOCATION, TRUE);
 		curl_setopt($this->_ch, CURLOPT_RETURNTRANSFER, TRUE);
 		curl_setopt($this->_ch, CURLOPT_SSL_VERIFYPEER, false);
 		curl_setopt($this->_ch, CURLOPT_USERAGENT, "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)");
+		curl_setopt($this->_ch, CURLOPT_HEADER, 0);
+		curl_setopt($this->_ch, CURLOPT_CONNECTTIMEOUT, 120);
+		curl_setopt($this->_ch, CURLOPT_TIMEOUT, 120);
 	}
 	
 	public function auth() {
 		$this->_logIn();
 		echo("authSuccess");
 	}
+
+private function getFormFields($data)
+{
+    if (preg_match('/(<form id=.?gaia_loginform.*?<\/form>)/is', $data, $matches)) {
+        $inputs = $this->getInputs($matches[1]);
+
+        return $inputs;
+    } else {
+	return NULL;
+        //die('didnt find login form');
+    }
+}
+
+private function getInputs($form)
+{
+    $inputs = array();
+
+    $elements = preg_match_all('/(<input[^>]+>)/is', $form, $matches);
+
+    if ($elements > 0) {
+        for($i = 0; $i < $elements; $i++) {
+            $el = preg_replace('/\s{2,}/', ' ', $matches[1][$i]);
+
+            if (preg_match('/name=(?:["\'])?([^"\'\s]*)/i', $el, $name)) {
+                $name  = $name[1];
+                $value = '';
+
+                if (preg_match('/value=(?:["\'])?([^"\'\s]*)/i', $el, $value)) {
+                    $value = $value[1];
+                }
+
+                $inputs[$name] = $value;
+            }
+        }
+    }
+
+    return $inputs;
+}
+
+        private function parse_rnr_se($html)
+        {
+                // "/'_rnr_se': '([^']+)'/"
+                // '/name="_rnr_se".*?value="(.*?)"/'
+                if( preg_match("/'_rnr_se': '([^']+)'/", $html, $match) ) {
+                        $this->_rnr_se = $match[1];
+                } else {
+                        die('authFailed');
+                }
+        }
 	
 	private function _logIn()
 	{
@@ -44,34 +97,54 @@ class GoogleVoice
 			return TRUE;
 
 		// fetch the login page
-		curl_setopt($this->_ch, CURLOPT_URL, 'https://www.google.com/accounts/ServiceLogin?passive=true&service=grandcentral');
+		curl_setopt($this->_ch, CURLOPT_URL, 'https://accounts.google.com/accounts/ServiceLogin?passive=true&service=grandcentral&continue=https://www.google.com/voice&followup=https://www.google.com/voice');
 		$html = curl_exec($this->_ch);
 
-		if(preg_match('/name="GALX"\s*value="([^"]+)"/', $html, $match))
+		/*if(preg_match('/name="GALX"\s*value="([^"]+)"/', $html, $match))
 			$GALX = $match[1];
 		else
 			die('authFailed');
+		if (preg_match('/name="dsh"\s*id="dsh"\s*value="([^"]+)"/', $html, $match))
+			$dsh = $match[1];
+		else
+			die('authFailed');*/
 
-		curl_setopt($this->_ch, CURLOPT_URL, 'https://www.google.com/accounts/ServiceLoginAuth?service=grandcentral');
+		$formFields = $this->getFormFields($html);
+		
+		if ($formFields == NULL) {
+			$this->parse_rnr_se($html);
+			return TRUE;
+		}
+
+		$formFields['Email']  = $this->_login;
+		$formFields['Passwd'] = $this->_pass;
+		unset($formFields['PersistentCookie']);
+
+		$post_string = '';
+		foreach($formFields as $key => $value) {
+    			$post_string .= $key . '=' . urlencode($value) . '&';
+		}
+
+		$post_string = substr($post_string, 0, -1);
+
+		curl_setopt($this->_ch, CURLOPT_URL, 'https://accounts.google.com/accounts/ServiceLoginAuth?service=grandcentral');
 		curl_setopt($this->_ch, CURLOPT_POST, TRUE);
-		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, array(
+		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, $post_string); 
+		/*curl_setopt($this->_ch, CURLOPT_POSTFIELDS, array(
 			'Email' => $this->_login,
 			'Passwd' => $this->_pass,
 			'continue' => 'https://www.google.com/voice/account/signin',
 			'service' => 'grandcentral',
-			'GALX' => $GALX
-			));
+			'GALX' => $GALX,
+			'dsh' => $dsh
+			));*/
+
 	
 		$html = curl_exec($this->_ch);
-		if( preg_match('/name="_rnr_se".*?value="(.*?)"/', $html, $match) )
-		{
-			$this->_rnr_se = $match[1];
-		}
-		else
-		{
-			die('authFailed');
-		}
+		$this->parse_rnr_se($html);
+
 	}
+
 
 	/**
 	 * Place a call to $number connecting first to $fromNumber
@@ -95,14 +168,14 @@ class GoogleVoice
 		
 		curl_setopt($this->_ch, CURLOPT_URL, 'https://www.google.com/voice/call/connect/');
 		curl_setopt($this->_ch, CURLOPT_POST, TRUE);
-		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, array(
-			'_rnr_se'=>$this->_rnr_se,
-			'forwardingNumber'=>'+1' . $fromNumber,
-			'outgoingNumber'=>$number,
-			'phoneType'=>$types[$phoneType],
-			'remember'=>0,
-			'subscriberNumber'=>'undefined'
-			));
+		curl_setopt($this->_ch, CURLOPT_POSTFIELDS,
+			'id&_rnr_se=' . $this->_rnr_se .
+			'&forwardingNumber=' . $fromNumber .
+			'&outgoingNumber=' . $number .
+			'&phoneType=' . $types[$phoneType] .
+			'&remember=0' .
+			'&subscriberNumber=undefined'
+			);
 		curl_exec($this->_ch);
 	}
 
@@ -112,12 +185,13 @@ class GoogleVoice
 
 		curl_setopt($this->_ch, CURLOPT_URL, 'https://www.google.com/voice/sms/send/');
 		curl_setopt($this->_ch, CURLOPT_POST, TRUE);
-		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, array(
-			'_rnr_se'=>$this->_rnr_se,
-			'phoneNumber'=>'+1' . $number,
-			'text'=>$message
-			));
-		curl_exec($this->_ch);
+
+		$postdata = 'id&_rnr_se=' . $this->_rnr_se .
+                        '&phoneNumber=' . $number .
+                        '&text=' . $message .
+                        '&sendErrorSms=0';
+		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, $postdata);
+		$response = curl_exec($this->_ch);
 	}
 	
 	public function getNewSMS() {
@@ -204,11 +278,11 @@ class GoogleVoice
 
 		curl_setopt($this->_ch, CURLOPT_URL, 'https://www.google.com/voice/inbox/deleteMessages/');
 		curl_setopt($this->_ch, CURLOPT_POST, TRUE);
-		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, array(
-			'_rnr_se'=>$this->_rnr_se,
-			'messages'=>$msgID,
-			'trash'=>1
-			));
+		curl_setopt($this->_ch, CURLOPT_POSTFIELDS,
+			'_rnr_se=' . $this->_rnr_se .
+			'&messages=' . $msgID .
+			'&trash=1'
+			);
 		curl_exec($this->_ch);
 	}
 	
@@ -218,11 +292,11 @@ class GoogleVoice
 
 		curl_setopt($this->_ch, CURLOPT_URL, 'https://www.google.com/voice/inbox/mark/');
 		curl_setopt($this->_ch, CURLOPT_POST, TRUE);
-		curl_setopt($this->_ch, CURLOPT_POSTFIELDS, array(
-			'_rnr_se'=>$this->_rnr_se,
-			'messages'=>$msgID,
-			'read'=>1
-			));
+		curl_setopt($this->_ch, CURLOPT_POSTFIELDS,
+			'_rnr_se=' . $this->_rnr_se .
+			'&messages=' . $msgID .
+			'&read=1'
+			);
 		curl_exec($this->_ch);
 	}
 	
