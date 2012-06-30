@@ -256,7 +256,7 @@ SmsReadAssistant.prototype.send = function()
 		
 		
 		
-		smsMsg.mojo.setValue("");
+		//smsMsg.mojo.setValue("");
 		document.getElementById('smsMsgSending').style.visibility = "visible";
 		Voogle.sendTxt(kt.cookies.get("voogle_userString"), {"number": sendNumber, "message": value}, function(data) {document.getElementById('smsMsgSending').style.visibility = "hidden";
 				if(time != lastTime)
@@ -268,6 +268,7 @@ SmsReadAssistant.prototype.send = function()
 				var side = "from";
 				document.getElementById('msgs').innerHTML += '<div class="'+side+'Message" id="msg_1"><div style="font-size:17px; margin-left:5px;">'+value+'</div></div>';
 				msgScroller.mojo.revealBottom();
+				smsMsg.mojo.setValue("");
 			});
 	}
 }
