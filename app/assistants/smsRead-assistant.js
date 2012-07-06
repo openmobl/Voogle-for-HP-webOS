@@ -1,9 +1,3 @@
-function SmsReadAssistant(smsId, sn){
-	msgId = smsId;
-
-		sendNumber = sn;
-	
-	}
 var email;
 var msgId;
 var password;
@@ -11,6 +5,17 @@ var msgList;
 var lastTime;
 var intID;
 var sendNumber;
+var smsMsg;
+
+function SmsReadAssistant(smsId, sn){
+	msgId = smsId;
+
+		sendNumber = sn;
+        
+        this.msgIsSendingMutex = false;
+	
+	}
+
 SmsReadAssistant.prototype.setup = function() {
 	//Mojo.Controller.errorDialog(msgId);
 	jQuery.noConflict();
@@ -38,6 +43,7 @@ this.controller.setupWidget("msgScroller",
 		value: "",
 		disabled: false
 	});
+    smsMsg = this.controller.get("smsMsg");
 	
 	this.controller.setupWidget("loader",
         this.attributes = {
@@ -104,8 +110,9 @@ this.controller.setupWidget("msgScroller",
 				var rows = convo.split('<div class="gc-message-sms-row">');
 				var xi = 1;
 				var lastTime;
+                if (rows !== undefined)
 				jQuery.each(rows, function(i, mess){
-					if (xi > 0) {
+					if (xi > 0 && rows[xi] !== undefined) {
 						var lastIndex = rows[xi].lastIndexOf('<span class="gc-message-sms-text">');
 						var recentMsg = rows[xi].substr(lastIndex + 34);
 						recentMsg = recentMsg.substr(0, recentMsg.indexOf('</span>'));
@@ -183,6 +190,8 @@ this.controller.setupWidget("msgScroller",
 SmsReadAssistant.prototype.keyDown = function(event) {
 	if(Mojo.Char.isEnterKey(event.keyCode))
 	{
+        event.preventDefault();
+        event.stopPropagation();
 		this.send();
 	}
 }
@@ -229,7 +238,7 @@ SmsReadAssistant.prototype.send = function()
 {
 	
 	var value = smsMsg.mojo.getValue();
-	if(value != "")
+	if(value != "" && this.msgIsSendingMutex != true)
 	{
 		var date = new Date();
 		var hour = date.getHours();
@@ -257,8 +266,10 @@ SmsReadAssistant.prototype.send = function()
 		
 		
 		//smsMsg.mojo.setValue("");
+        this.msgIsSendingMutex = true;
 		document.getElementById('smsMsgSending').style.visibility = "visible";
-		Voogle.sendTxt(kt.cookies.get("voogle_userString"), {"number": sendNumber, "message": value}, function(data) {document.getElementById('smsMsgSending').style.visibility = "hidden";
+		Voogle.sendTxt(kt.cookies.get("voogle_userString"), {"number": sendNumber, "message": value}, function(data) {
+                document.getElementById('smsMsgSending').style.visibility = "hidden";
 				if(time != lastTime)
 				{
 					//Add time divider...
@@ -269,7 +280,12 @@ SmsReadAssistant.prototype.send = function()
 				document.getElementById('msgs').innerHTML += '<div class="'+side+'Message" id="msg_1"><div style="font-size:17px; margin-left:5px;">'+value+'</div></div>';
 				msgScroller.mojo.revealBottom();
 				smsMsg.mojo.setValue("");
-			});
+                this.msgIsSendingMutex = false;
+			}.bind(this),
+            function(data) {
+                document.getElementById('smsMsgSending').style.visibility = "hidden";
+                this.msgIsSendingMutex = false;
+            }.bind(this));
 	}
 }
 
@@ -283,6 +299,9 @@ function update() {
 		var xmlData = data.substr(data.indexOf('<html><![CDATA[') + 15);
 		xmlData = xmlData.substr(0, xmlData.indexOf(']]></html>'));
 		//var oldList = inboxList;
+        if (json === null) {
+            return;
+        }
 		var messages = json[0]["messages"];
 		var convos = xmlData.split('<span class="gc-message-name">');
 		var x = 1;
@@ -302,8 +321,9 @@ function update() {
 				var rows = convo.split('<div class="gc-message-sms-row">');
 				var xi = 1;
 				var lastTime;
+                if (rows !== undefined)
 				jQuery.each(rows, function(i, mess){
-					if (xi > 0) {
+					if (xi > 0 && rows[xi] !== undefined) {
 						var lastIndex = rows[xi].lastIndexOf('<span class="gc-message-sms-text">');
 						var recentMsg = rows[xi].substr(lastIndex + 34);
 						recentMsg = recentMsg.substr(0, recentMsg.indexOf('</span>'));

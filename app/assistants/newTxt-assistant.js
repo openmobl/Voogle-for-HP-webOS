@@ -41,6 +41,9 @@ NewTxtAssistant.prototype.setup = function() {
 		value: "",
 		disabled: false
 	});
+    
+    smsNum = this.controller.get("smsNum");
+    smsMsg = this.controller.get("smsMsg");
 	
 	this.keyHandler = this.keyDown.bindAsEventListener(this);
 	Mojo.Event.listen(this.controller.document, 'keydown',this.keyHandler, true);
