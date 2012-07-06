@@ -1,6 +1,6 @@
 {
 	"id": "com.openmobl.app.voogle",
-	"version": "2.1.4",
+	"version": "2.1.5",
 	"vendor": "OpenMobl Systems",
 	"type": "web",
 	"main": "index.html",
